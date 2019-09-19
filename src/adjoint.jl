@@ -18,6 +18,7 @@ end
 abstract type AContext end
 function adjoint end
 function _pullback end
+function pullback end
 
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
