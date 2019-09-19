@@ -17,7 +17,7 @@ end
 
 abstract type AContext end
 function adjoint end
-function _forward end
+function _pullback end
 
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
@@ -42,13 +42,13 @@ function gradm(ex, mut = false)
   adj = @q @inline ZygoteRules.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
   quote
     $adj
-    @inline function ZygoteRules._forward($cx, $f::$T, $(args...)) where $(Ts...)
+    @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuple(_back(Δ))
       return y, back
     end
-    @inline function ZygoteRules._forward($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+    @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
       back(Δ) = $gradtuplekw(_back(Δ))
