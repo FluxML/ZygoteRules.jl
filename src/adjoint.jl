@@ -56,13 +56,13 @@ function gradm(ex, mut = false)
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(_back(Δ))
+      back(Δ) = $gradtuple(ZygoteRules.keeplike(($(args...),), _back(Δ)))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(_back(Δ))
+      back(Δ) = $gradtuplekw(ZygoteRules.keeplike(($(args...),), _back(Δ)))
       return y, back
     end
     nothing
@@ -76,3 +76,11 @@ end
 macro adjoint!(ex)
   gradm(ex, true)
 end
+
+keeplike(x::Real, dx::Complex) = real(dx)
+keeplike(x::AbstractArray{<:Real}, dx::AbstractArray{<:Complex}) = real(dx)
+keeplike(args::Tuple{Vararg{Any,N}}, grads::Tuple{Vararg{Any,N}}) where {N} =
+    map(keeplike, args, grads)
+keeplike(x, dx) = dx
+
+@adjoint real(x) = real(x), dy -> (real(dy),)
