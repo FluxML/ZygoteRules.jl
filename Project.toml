@@ -1,12 +1,13 @@
 name = "ZygoteRules"
 uuid = "700de1a5-db45-46bc-99cf-38207098b444"
-version = "0.3.0"
+version = "0.2.0"
 
 [deps]
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]
 julia = "1"
+MacroTools = "0.5"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
