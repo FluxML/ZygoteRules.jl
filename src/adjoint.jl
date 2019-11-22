@@ -54,15 +54,17 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
+      argTs = map(typeof, ($(args...),))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(ZygoteRules.keeplike(($(args...),), _back(Δ)))
+      back(Δ) = $gradtuple(ZygoteRules.clamptype(argTs, _back(Δ)))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      argTs = map(typeof, ($(args...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(ZygoteRules.keeplike(($(args...),), _back(Δ)))
+      back(Δ) = $gradtuplekw(ZygoteRules.clamptype(argTs, _back(Δ)))
       return y, back
     end
     nothing
@@ -77,10 +79,9 @@ macro adjoint!(ex)
   gradm(ex, true)
 end
 
-keeplike(x::Real, dx::Complex) = real(dx)
-keeplike(x::AbstractArray{<:Real}, dx::AbstractArray{<:Complex}) = real(dx)
-keeplike(args::Tuple{Vararg{Any,N}}, grads::Tuple{Vararg{Any,N}}) where {N} =
-    map(keeplike, args, grads)
-keeplike(x, dx) = dx
+clamptype(::Type{<:Real}, dx::Complex) = real(dx)
+clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) = real(dx)
+clamptype(Ts::Type{Tuple{Vararg{Any,N}}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
+    map(clamptype, Ts.parameters, dxs)
+clamptype(x, dx) = dx
 
-@adjoint real(x) = real(x), dy -> (real(dy),)
