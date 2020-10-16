@@ -14,7 +14,7 @@ Issue a warning that a ChainRules differential type was expected but a Zygote le
 was received. This is used to report bugs in transitioning to ChainRules types and can be
 deleted once/if `@adjoint` macro is deprecated.
 """
-function legacytype_warn(::T) where T
+function legacytype_warn(::Type{T}) where T
   # can't use logging macros as that breaks nested AD.
   Core.println("""
     Zygote internal use of $T, rather than AbstractZero/Composite,
@@ -34,7 +34,7 @@ Issue a warning that a Zygote legacy type was expected but a ChainRules differen
 was received. This is used to report bugs in transitioning to ChainRules types and can be
 deleted once/if `@adjoint` macro is deprecated.
 """
-function difftype_warn(::T) where T
+function difftype_warn(::Type{T}) where T
   # can't use logging macros as that breaks nested AD.
   Core.println("""
     $T passed when NothingTuple/NamedTuple expected. This should never
