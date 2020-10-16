@@ -99,8 +99,6 @@ function adjoint end
 function _pullback end
 function pullback end
 
-say(x) = (Core.println(x); return x)
-
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
                          (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
@@ -133,7 +131,7 @@ function gradm(ex, mut = false)
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
-      back(Δ) = $gradtuplekw(legacy2differential(say(_back(differential2legacy(Δ)))))
+      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ))))
       return y, back
     end
     return nothing  # make nothing show in terminal after using macro
