@@ -14,10 +14,10 @@ Issue a warning that a ChainRules differential type was expected but a Zygote le
 was received. This is used to report bugs in transitioning to ChainRules types and can be
 deleted once/if `@adjoint` macro is deprecated.
 """
-function legacytype_warn()
+function legacytype_warn(::T) where T
   # can't use logging macros as that breaks nested AD.
   Core.println("""
-    Zygote internal use of Nothing/Tuple/NamedTuple, rather than AbstractZero/Composite,
+    Zygote internal use of $T, rather than AbstractZero/Composite,
     detected. This should never occur. Please open an issue on
     https://github.com/FluxML/Zygote.jl/issues, including the full text of this message.
     Stacktrace:"""
@@ -34,10 +34,10 @@ Issue a warning that a Zygote legacy type was expected but a ChainRules differen
 was received. This is used to report bugs in transitioning to ChainRules types and can be
 deleted once/if `@adjoint` macro is deprecated.
 """
-function difftype_warn()
+function difftype_warn(::T) where T
   # can't use logging macros as that breaks nested AD.
   Core.println("""
-    AbstractZero/Composite passed when NothingTuple/NamedTuple expected. This should never
+    $T passed when NothingTuple/NamedTuple expected. This should never
     occur. Please open an issue on https://github.com/FluxML/Zygote.jl/issues, including
     the full text of this message.
     Stacktrace:"""
@@ -54,7 +54,7 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 """
 legacy2differential(x) = x
 legacy2differential(::Nothing) = Zero()
-legacy2differential(x::Union{AbstractZero, Composite}) = (difftype_warn(); return x)
+legacy2differential(x::Union{AbstractZero, Composite}) = (difftype_warn(x); return x)
 legacy2differential(t::Union{Tuple, NamedTuple}) = map(l2d, t)
 
 l2d(x) = x
@@ -71,7 +71,7 @@ Convert input `x` from the ChainRules differential types to the legacy ZygoteRul
 differential2legacy(x) = unthunk(x) # TODO eventually remove this
 differential2legacy(::AbstractZero) = nothing
 differential2legacy(t::Union{Tuple, NamedTuple}) = map(differential2legacy, t)
-differential2legacy(::Nothing) = (legacytype_warn(); return nothing)
+differential2legacy(::Nothing) = (legacytype_warn(nothing); return nothing)
 #differential2legacy(x::Tuple{Vararg{AbstractZero}}) = Zero() # TODO should this happen?
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
