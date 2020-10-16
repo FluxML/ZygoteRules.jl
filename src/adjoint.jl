@@ -55,7 +55,8 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 legacy2differential(x) = x
 legacy2differential(::Nothing) = Zero()
 legacy2differential(x::Union{AbstractZero, Composite}) = (difftype_warn(x); return x)
-legacy2differential(t::Union{Tuple, NamedTuple}) = map(l2d, t)
+legacy2differential(nt::NamedTuple) = l2d(nt)
+legacy2differential(t::Union{Tuple}) = map(l2d, t)
 
 l2d(x) = x
 l2d(::Nothing) = Zero()
@@ -98,6 +99,8 @@ function adjoint end
 function _pullback end
 function pullback end
 
+say(x) = (Core.println(x); return x)
+
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
                          (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
@@ -130,7 +133,7 @@ function gradm(ex, mut = false)
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
-      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ))))
+      back(Δ) = $gradtuplekw(legacy2differential(say(_back(differential2legacy(Δ)))))
       return y, back
     end
     return nothing  # make nothing show in terminal after using macro
