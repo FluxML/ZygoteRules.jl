@@ -52,18 +52,34 @@ end
 
 Convert input `x` from the legacy ZygoteRules format to the ChainRules differential types.
 """
-legacy2differential(x) = x
-legacy2differential(::Nothing) = Zero()
-legacy2differential(x::Union{AbstractZero, Composite}) = (difftype_warn(x); return x)
-legacy2differential(nt::NamedTuple) = l2d(nt)
-legacy2differential(t::Union{Tuple}) = map(l2d, t)
+legacy2differential(x, ::Any) = x
+legacy2differential(::Nothing, ::Any) = Zero()
+legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
+#legacy2differential(nt::NamedTuple) = l2d(nt)
+legacy2differential(t::Tuple, primal_types) = map(l2d, t, primal_types)
 
-l2d(x) = x
-l2d(::Nothing) = Zero()
-function l2d(t::Union{Tuple, NamedTuple})
-  tp = map(l2d, t)
-  return Composite{Any, typeof(tp)}(tp)
+l2d(x, ::Any) = x
+l2d(::Nothing, ::Any) = Zero()
+l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
+function l2d(t::Tuple, primal_type)
+  #@show primal_type
+  primal_field_types = fieldtypes(primal_type)
+  #@show primal_field_types
+  tp = map(l2d, t, primal_field_types)
+  #@show tp
+  return Composite{primal_type, typeof(tp)}(tp)
 end
+
+function l2d(t::NamedTuple, primal_type)
+  #@show primal_type
+  primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
+  #@show primal_field_types
+  tp = map(l2d, t, primal_field_types)
+  #@show tp
+  return Composite{primal_type, typeof(tp)}(tp)
+end
+
+
 """
     differential2legacy(x)
 
