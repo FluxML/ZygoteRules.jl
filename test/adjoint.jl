@@ -19,4 +19,14 @@
     @test legacy2differential(tuple(legacy)) == tuple(differential)
     @test legacy2differential(tuple(legacy), tuple(typeof(legacy))) == tuple(differential)
     @test legacy2differential(tuple(legacy), tuple(Foo)) == tuple(differential)
+
+    struct Bar
+        x
+        y::Foo
+    end
+    f = Foo(1, 2)
+    b = Bar(3, f)
+    legacy = (x=nothing, y=(a=1, b=nothing))
+    differential = Composite{Bar}(x=Zero(), y=Composite{Foo}(a=1, b=Zero()))
+    @test legacy2differential(tuple(legacy), tuple(Bar)) == tuple(differential)
 end

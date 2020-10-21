@@ -73,7 +73,6 @@ function l2d(t::NamedTuple, primal_type)
   return Composite{primal_type, typeof(tp)}(tp)
 end
 
-
 """
     differential2legacy(x)
 
