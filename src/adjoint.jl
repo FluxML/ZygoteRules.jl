@@ -55,8 +55,7 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 legacy2differential(x, ::Any) = x
 legacy2differential(::Nothing, ::Any) = Zero()
 legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
-#legacy2differential(nt::NamedTuple) = l2d(nt)
-function legacy2differential(t::NTuple{N}, primal_types::NTuple{N}) where N
+function legacy2differential(t::Tuple, primal_types::Tuple)
   map(l2d, t, primal_types)
 end
 
