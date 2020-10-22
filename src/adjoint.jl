@@ -56,26 +56,22 @@ legacy2differential(x, ::Any) = x
 legacy2differential(::Nothing, ::Any) = Zero()
 legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
 #legacy2differential(nt::NamedTuple) = l2d(nt)
-legacy2differential(t::Tuple, primal_types) = map(l2d, t, primal_types)
+function legacy2differential(t::NTuple{N}, primal_types::NTuple{N}) where N
+  map(l2d, t, primal_types)
+end
 
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
 l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
 function l2d(t::Tuple, primal_type)
-  #@show primal_type
   primal_field_types = fieldtypes(primal_type)
-  #@show primal_field_types
   tp = map(l2d, t, primal_field_types)
-  #@show tp
   return Composite{primal_type, typeof(tp)}(tp)
 end
 
 function l2d(t::NamedTuple, primal_type)
-  #@show primal_type
   primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
-  #@show primal_field_types
   tp = map(l2d, t, primal_field_types)
-  #@show tp
   return Composite{primal_type, typeof(tp)}(tp)
 end
 
@@ -87,7 +83,7 @@ Convert input `x` from the ChainRules differential types to the legacy ZygoteRul
 differential2legacy(x) = unthunk(x) # TODO eventually remove this
 differential2legacy(::AbstractZero) = nothing
 differential2legacy(t::Union{Tuple, NamedTuple}) = map(differential2legacy, t)
-differential2legacy(::Nothing) = (legacytype_warn(nothing); return nothing)
+differential2legacy(::Nothing) = (legacytype_warn(Nothing); return nothing)
 #differential2legacy(x::Tuple{Vararg{AbstractZero}}) = Zero() # TODO should this happen?
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
@@ -138,15 +134,20 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
+      argtypes = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
-      back(Δ) = $gradtuple(legacy2differential(_back(differential2legacy(Δ))))
+      function back(Δ)
+        _partials = _back(differential2legacy(Δ))
+        $gradtuple(legacy2differential(_partials, argtypes))
+      end
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      argtypes = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
-      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ))))
+      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ)), argtypes))
       return y, back
     end
     return nothing  # make nothing show in terminal after using macro
