@@ -1,16 +1,105 @@
 using MacroTools
 using MacroTools: @q, combinedef
+using ChainRulesCore: AbstractZero, Zero, DoesNotExist, Composite, unthunk, canonicalize
 
 named(arg) = isexpr(arg, :(::)) && length(arg.args) == 1 ? :($(gensym())::$(arg.args[1])) : arg
 
 typeless(x) = MacroTools.postwalk(x -> isexpr(x, :(::), :kw) ? x.args[1] : x, x)
 isvararg(x) = isexpr(x, :(::)) && namify(x.args[2]) == :Vararg
 
+"""
+    legacytype_warn()
+
+Issue a warning that a ChainRules differential type was expected but a Zygote legacy type
+was received. This is used to report bugs in transitioning to ChainRules types and can be
+deleted once/if `@adjoint` macro is deprecated.
+"""
+function legacytype_warn(::Type{T}) where T
+  # can't use logging macros as that breaks nested AD.
+  Core.println("""
+    Zygote internal use of $T, rather than AbstractZero/Composite,
+    detected. This should never occur. Please open an issue on
+    https://github.com/FluxML/Zygote.jl/issues, including the full text of this message.
+    Stacktrace:"""
+  )
+  for (i, callsite) in enumerate(stacktrace())
+    Core.println("[$i] $callsite")
+  end
+end
+
+"""
+    difftype_warn()
+
+Issue a warning that a Zygote legacy type was expected but a ChainRules differential type
+was received. This is used to report bugs in transitioning to ChainRules types and can be
+deleted once/if `@adjoint` macro is deprecated.
+"""
+function difftype_warn(x)
+  # can't use logging macros as that breaks nested AD.
+  Core.println("""
+    $x passed when Nothing/Tuple/NamedTuple expected. This should never
+    occur. Please open an issue on https://github.com/FluxML/Zygote.jl/issues, including
+    the full text of this message.
+    Stacktrace:"""
+  )
+  for (i, callsite) in enumerate(stacktrace())
+    Core.println("[$i] $callsite")
+  end
+end
+
+"""
+    legacy2differential(x)
+
+Convert input `x` from the legacy ZygoteRules format to the ChainRules differential types.
+"""
+legacy2differential(x, ::Any) = x
+legacy2differential(::Nothing, ::Any) = Zero()
+legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
+function legacy2differential(t::Tuple, primal_types::Tuple)
+  map(l2d, t, primal_types)
+end
+
+l2d(x, ::Any) = x
+l2d(::Nothing, ::Any) = Zero()
+l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
+function l2d(t::Tuple, primal_type)
+  primal_field_types = fieldtypes(primal_type)
+  tp = map(l2d, t, primal_field_types)
+  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
+end
+
+function l2d(t::NamedTuple, primal_type)
+  primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
+  tp = map(l2d, t, primal_field_types)
+  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
+end
+
+"""
+    differential2legacy(x)
+
+Convert input `x` from the ChainRules differential types to the legacy ZygoteRules format.
+"""
+differential2legacy(x) = unthunk(x) # TODO eventually remove this
+differential2legacy(::AbstractZero) = nothing
+differential2legacy(t::Union{Tuple, NamedTuple}) = map(differential2legacy, t)
+differential2legacy(::Nothing) = (legacytype_warn(Nothing); return nothing)
+#differential2legacy(x::Tuple{Vararg{AbstractZero}}) = Zero() # TODO should this happen?
+for T_outer in (:Tuple, :NamedTuple)
+  # we create separate methods rather than using a `Union` + an `if` so that we avoid a
+  # branch that changes output type, because nested AD on that kinda thing makes Zygote less
+  # than happy.
+  @eval @inline function differential2legacy(x::Composite{P, T}) where {P, T<:$T_outer}
+    xp = map(differential2legacy, canonicalize(x))
+    convert($T_outer, xp)
+  end
+end
+
 for n = 0:3
   gradtuple = Symbol(:gradtuple, n)
   @eval begin
-    $gradtuple(x::Tuple) = ($(ntuple(_->:nothing,n)...), x...)
-    $gradtuple(x::Nothing) = nothing
+    $gradtuple(x::Tuple) = ($(ntuple(_->:(DoesNotExist()),n)...), x...)
+    $gradtuple(x::AbstractZero) = x
+    $gradtuple(x::Composite) = x # TODO should this be here?
     $gradtuple(x) = error("Gradient $x should be a tuple")
   end
 end
@@ -44,18 +133,23 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
+      argtypes = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...))
-      $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(_back(Δ))
+      $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
+      function back(Δ)
+        _partials = _back(differential2legacy(Δ))
+        $gradtuple(legacy2differential(_partials, argtypes))
+      end
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      argtypes = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
-      $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(_back(Δ))
+      $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
+      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ)), argtypes))
       return y, back
     end
-    nothing
+    return nothing  # make nothing show in terminal after using macro
   end
 end
 
