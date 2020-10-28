@@ -1,6 +1,6 @@
 using MacroTools
 using MacroTools: @q, combinedef
-using ChainRulesCore: AbstractZero, Zero, DoesNotExist, Composite, unthunk
+using ChainRulesCore: AbstractZero, Zero, DoesNotExist, Composite, unthunk, canonicalize
 
 named(arg) = isexpr(arg, :(::)) && length(arg.args) == 1 ? :($(gensym())::$(arg.args[1])) : arg
 
@@ -34,10 +34,10 @@ Issue a warning that a Zygote legacy type was expected but a ChainRules differen
 was received. This is used to report bugs in transitioning to ChainRules types and can be
 deleted once/if `@adjoint` macro is deprecated.
 """
-function difftype_warn(::Type{T}) where T
+function difftype_warn(x)
   # can't use logging macros as that breaks nested AD.
   Core.println("""
-    $T passed when NothingTuple/NamedTuple expected. This should never
+    $x passed when Nothing/Tuple/NamedTuple expected. This should never
     occur. Please open an issue on https://github.com/FluxML/Zygote.jl/issues, including
     the full text of this message.
     Stacktrace:"""
@@ -65,13 +65,13 @@ l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
 function l2d(t::Tuple, primal_type)
   primal_field_types = fieldtypes(primal_type)
   tp = map(l2d, t, primal_field_types)
-  return Composite{primal_type, typeof(tp)}(tp)
+  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
 end
 
 function l2d(t::NamedTuple, primal_type)
   primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
   tp = map(l2d, t, primal_field_types)
-  return Composite{primal_type, typeof(tp)}(tp)
+  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
 end
 
 """
@@ -89,7 +89,7 @@ for T_outer in (:Tuple, :NamedTuple)
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
   # than happy.
   @eval @inline function differential2legacy(x::Composite{P, T}) where {P, T<:$T_outer}
-    xp = map(differential2legacy, x)
+    xp = map(differential2legacy, canonicalize(x))
     convert($T_outer, xp)
   end
 end
