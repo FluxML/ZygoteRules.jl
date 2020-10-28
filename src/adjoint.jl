@@ -55,9 +55,9 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 legacy2differential(x, ::Any) = x
 legacy2differential(::Nothing, ::Any) = Zero()
 legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
-function legacy2differential(t::Tuple, primal_types::Tuple)
-  map(l2d, t, primal_types)
-end
+legacy2differential(a::AbstractArray{<:Number}, primal_type) = a
+legacy2differential(a::AbstractArray, primal_type) = l2d.(a, primal_type) # TODO: what to do with arrays containing nothings? the return type here is Array{Any}
+legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
 
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
@@ -84,6 +84,8 @@ differential2legacy(::AbstractZero) = nothing
 differential2legacy(t::Union{Tuple, NamedTuple}) = map(differential2legacy, t)
 differential2legacy(::Nothing) = (legacytype_warn(Nothing); return nothing)
 #differential2legacy(x::Tuple{Vararg{AbstractZero}}) = Zero() # TODO should this happen?
+differential2legacy(a::AbstractArray) = differential2legacy.(a) # TODO: what to do with arrays with nothing?
+differential2legacy(a::AbstractArray{<:Number}) = a
 for T_outer in (:Tuple, :NamedTuple)
   # we create separate methods rather than using a `Union` + an `if` so that we avoid a
   # branch that changes output type, because nested AD on that kinda thing makes Zygote less
