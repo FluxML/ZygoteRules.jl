@@ -58,9 +58,8 @@ legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x
 legacy2differential(a::AbstractArray{<:Number}, primal_type) = a
 legacy2differential(a::AbstractArray, primal_type) = l2d.(a, primal_type) # TODO: what to do with arrays containing nothings? the return type here is Array{Any}
 legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
+legacy2differential(t::Tuple, primal_types) = (@warn "primal_types should be a tuple, not $primal_types"; return t)
 
-recursive_typeof(a) = typeof(a)
-recursive_typeof(a::Union{AbstractArray, Tuple}) = recursive_typeof.(a)
 
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()

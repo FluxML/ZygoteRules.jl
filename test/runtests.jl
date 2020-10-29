@@ -9,5 +9,6 @@ foo(x) = 2x
 # using Zygote
 
 # @test gradient(foo, x) == (3,)
-
-include("adjoint.jl")
+@testset "ZygoteRules" begin
+  include("adjoint.jl")
+end
