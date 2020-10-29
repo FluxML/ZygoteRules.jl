@@ -1,5 +1,5 @@
 using ZygoteRules
-using ZygoteRules: legacy2differential, differential2legacy
+using ZygoteRules: legacy2differential, differential2legacy, recursive_typeof
 using ChainRulesCore
 using Test
 
