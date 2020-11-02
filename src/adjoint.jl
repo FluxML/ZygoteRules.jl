@@ -1,7 +1,17 @@
 using MacroTools
 using MacroTools: @q, combinedef
 
-named(arg) = isexpr(arg, :(::)) && length(arg.args) == 1 ? :($(gensym())::$(arg.args[1])) : arg
+function named(arg)
+  if isexpr(arg, :(::)) && length(arg.args) == 1
+    :($(gensym())::$(arg.args[1]))
+  elseif isexpr(arg, :kw)
+    @assert length(arg.args) == 2
+    decl, default = arg.args
+    Expr(:kw, named(decl), default)
+  else
+    arg
+  end
+end
 
 typeless(x) = MacroTools.postwalk(x -> isexpr(x, :(::), :kw) ? x.args[1] : x, x)
 isvararg(x) = isexpr(x, :(::)) && namify(x.args[2]) == :Vararg
