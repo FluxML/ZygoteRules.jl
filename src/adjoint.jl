@@ -55,6 +55,7 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 legacy2differential(x, ::Any) = x
 legacy2differential(::Nothing, ::Any) = Zero()
 legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
+legacy2differential(nt::NamedTuple, primal_type) = l2d(nt, primal_type)
 legacy2differential(t::Tuple, primal_types) = (@warn "primal_types should be a tuple, not $primal_types"; return t)
 
 l2d(x, ::Any) = x
@@ -72,7 +73,8 @@ end
 function l2d(t::NamedTuple, primal_type)
   if !isabstracttype(primal_type)
     primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
-    tp = map(l2d, t, primal_field_types)
+    complete_t = NamedTuple{keys(primal_field_types)}(k in keys(t) ? t[k] : nothing for (k,v) in pairs(primal_field_types))
+    tp = map(l2d, complete_t, primal_field_types)
     return canonicalize(Composite{primal_type, typeof(tp)}(tp))
   else
     #TODO: we could fix this if we had the primal values
@@ -154,11 +156,11 @@ function gradm(ex, mut = false)
       function back(Δ)
         _partials = _back(differential2legacy(Δ))
         if _partials isa Tuple && any(x isa Union{AbstractZero, Composite} for x in _partials)
-          println("Wrong partial type returned. adjoint definition:")
+          @warn "Wrong partial type returned. adjoint definition:"
           @show ($(QuoteNode(ex)))
         end
         if _partials isa Union{AbstractZero, Composite}
-          println("Wrong partial type returned. adjoint definition:")
+          @warn "Wrong partial type returned. adjoint definition:"
           @show ($(QuoteNode(ex)))
         end
 
