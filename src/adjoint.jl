@@ -61,7 +61,7 @@ l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
 l2d(a::AbstractArray{<:Number}, primal_type) = a
 l2d(a::AbstractArray, primal_type) = l2d.(a, eltype(primal_type))
-l2d(a::AbstractArray, primal_type::AbstractArray{T}) where T = l2d.(a, T)
+l2d(a::AbstractArray, primal_type::AbstractArray{T}) where T = l2d.(a, primal_type) # TODO: T or primal_type?
 l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
 function l2d(t::Tuple, primal_type)
   primal_field_types = fieldtypes(primal_type)
