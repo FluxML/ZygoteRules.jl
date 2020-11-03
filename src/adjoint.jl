@@ -114,6 +114,11 @@ for n = 0:3
   end
 end
 
+diffgradtuple1(x::Tuple) = (DoesNotExist(), x...)
+diffgradtuple1(x::AbstractZero) = x
+diffgradtuple1(::Nothing) = (legacytype_warn(x); DoesNotExist())
+diffgradtuple1(x) = error("Gradient $x should be a tuple")
+
 abstract type AContext end
 function adjoint end
 function _pullback end
