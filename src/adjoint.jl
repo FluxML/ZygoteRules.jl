@@ -54,17 +54,14 @@ Convert input `x` from the legacy ZygoteRules format to the ChainRules different
 """
 legacy2differential(x, ::Any) = x
 legacy2differential(::Nothing, ::Any) = Zero()
-legacy2differential(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
-legacy2differential(a::AbstractArray{<:Number}, primal_type) = a
-legacy2differential(a::AbstractArray, primal_type) = l2d.(a, primal_type) # TODO: what to do with arrays containing nothings? the return type here is Array{Any}
 legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
 legacy2differential(t::Tuple, primal_types) = (@warn "primal_types should be a tuple, not $primal_types"; return t)
-
 
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
 l2d(a::AbstractArray{<:Number}, primal_type) = a
-l2d(a::AbstractArray, primal_type) = l2d.(a, primal_type)
+l2d(a::AbstractArray, primal_type) = l2d.(a, eltype(primal_type))
+l2d(a::AbstractArray, primal_type::AbstractArray{T}) where T = l2d.(a, T)
 l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
 function l2d(t::Tuple, primal_type)
   primal_field_types = fieldtypes(primal_type)
@@ -73,9 +70,16 @@ function l2d(t::Tuple, primal_type)
 end
 
 function l2d(t::NamedTuple, primal_type)
-  primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
-  tp = map(l2d, t, primal_field_types)
-  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
+  if !isabstracttype(primal_type)
+    primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
+    tp = map(l2d, t, primal_field_types)
+    return canonicalize(Composite{primal_type, typeof(tp)}(tp))
+  else
+    #TODO: we could fix this if we had the primal values
+    @warn "Could not determine Primal Type. This may make bad composites. This is caused by `Array{Any}` containing structs and similar."
+    tp = l2d.(t, Any)
+    return canonicalize(Composite{primal_type, typeof(tp)}(tp))
+  end
 end
 
 """
@@ -103,9 +107,9 @@ end
 for n = 0:3
   gradtuple = Symbol(:gradtuple, n)
   @eval begin
-    $gradtuple(x::Tuple) = ($(ntuple(_->:(DoesNotExist()),n)...), x...)
-    $gradtuple(x::AbstractZero) = x
-    $gradtuple(x::Composite) = x # TODO should this be here?
+    $gradtuple(x::Tuple) = ($(ntuple(_->:(nothing),n)...), x...)
+    $gradtuple(x::AbstractZero) = (difftype_warn(x); nothing) # TODO for now, remove these later once the warnings are fixed
+    $gradtuple(::Nothing) = nothing
     $gradtuple(x) = error("Gradient $x should be a tuple")
   end
 end
@@ -144,7 +148,22 @@ function gradm(ex, mut = false)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
       function back(Δ)
         _partials = _back(differential2legacy(Δ))
-        $gradtuple(legacy2differential(_partials, argtypes))
+        if _partials isa Tuple && any(x isa Union{AbstractZero, Composite} for x in _partials)
+          println("Wrong partial type returned. adjoint definition:")
+          @show ($(QuoteNode(ex)))
+        end
+        if _partials isa Union{AbstractZero, Composite}
+          println("Wrong partial type returned. adjoint definition:")
+          @show ($(QuoteNode(ex)))
+        end
+
+        try
+          legacy2differential($gradtuple(_partials), ($T, argtypes...))
+        catch
+          println("Error occured. adjoint definition:")
+          @show ($(QuoteNode(ex)))
+          rethrow()
+        end
       end
       return y, back
     end
@@ -152,7 +171,11 @@ function gradm(ex, mut = false)
       argtypes = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
-      back(Δ) = $gradtuplekw(legacy2differential(_back(differential2legacy(Δ)), argtypes))
+      #back(Δ) = $gradtuplekw(legacy2differential(_partials, argtypes))
+      function back(Δ)
+        _partials = _back(differential2legacy(Δ))
+        legacy2differential($gradtuplekw(_partials), ($kT, typeof(kw), $T, argtypes...))
+      end
       return y, back
     end
     return nothing  # make nothing show in terminal after using macro

@@ -150,7 +150,13 @@ end
 
     @testset "triple nested tuple" begin
         legacy = (((nothing, 1),),)
-        differential = (Composite{Tuple{Composite{Tuple{Zero,Int64},Tuple{Zero,Int64}}}}(Composite{Tuple{Zero,Int64}}(Zero(), 1),),)
+        differential = (
+            Composite{
+                Tuple{Composite{Tuple{Zero,Int64},Tuple{Zero,Int64}}}
+            }(
+                Composite{Tuple{Zero,Int64}}(Zero(), 1),
+            ),
+        )
         @test legacy2differential(legacy, typeof.(legacy)) == differential
     end
 end
