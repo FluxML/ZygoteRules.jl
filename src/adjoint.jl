@@ -52,10 +52,9 @@ end
 
 Convert input `x` from the legacy ZygoteRules format to the ChainRules differential types.
 """
-legacy2differential(x, ::Any) = x
+legacy2differential(x, primal_type) = l2d(x, primal_type)
 legacy2differential(::Nothing, ::Any) = Zero()
 legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
-legacy2differential(nt::NamedTuple, primal_type) = l2d(nt, primal_type)
 legacy2differential(t::Tuple, primal_types) = (@warn "primal_types should be a tuple, not $primal_types"; return t)
 
 l2d(x, ::Any) = x
