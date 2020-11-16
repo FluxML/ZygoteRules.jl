@@ -52,28 +52,28 @@ end
 
 Convert input `x` from the legacy ZygoteRules format to the ChainRules differential types.
 """
-legacy2differential(x, dummy_primal) = l2d(x, dummy_primal)
+legacy2differential(x, primal) = l2d(x, primal)
 legacy2differential(::Nothing, ::Any) = Zero()
-legacy2differential(t::Tuple, dummy_primal::Tuple) = map(l2d, t, dummy_primal)
-legacy2differential(t::Tuple, dummy_primal) = (@warn "dummy_primal should be a tuple, not $dummy_primal"; return t)
+legacy2differential(t::Tuple, primal::Tuple) = map(l2d, t, primal)
+legacy2differential(t::Tuple, primal) = (@warn "primal should be a tuple, not $primal"; return t)
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
-l2d(a::AbstractArray{<:Number}, dummy_primal::AbstractArray{T}) where T = a
-l2d(a::AbstractArray, dummy_primal::AbstractArray{T}) where T = l2d.(a, dummy_primal)
+l2d(a::AbstractArray{<:Number}, primal::AbstractArray{T}) where T = a
+l2d(a::AbstractArray, primal::AbstractArray{T}) where T = l2d.(a, primal)
 l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
-function l2d(t::Tuple, dummy_primal)
-  tp = map(l2d, t, dummy_primal)
-  primal_type = typeof(dummy_primal)
+function l2d(t::Tuple, primal)
+  tp = map(l2d, t, primal)
+  primal_type = typeof(primal)
   return canonicalize(Composite{primal_type, typeof(tp)}(tp))
 end
 
-function l2d(t::NamedTuple, dummy_primal)
-  primal_type = typeof(dummy_primal)
+function l2d(t::NamedTuple, primal)
+  primal_type = typeof(primal)
   if !isabstracttype(primal_type)
     fnames = fieldnames(primal_type)
     complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
-    dummy_primals = NamedTuple{fnames}(getfield(dummy_primal, fn) for fn in fnames)
-    tp = map(l2d, complete_t, dummy_primals)
+    primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
+    tp = map(l2d, complete_t, primals)
     return canonicalize(Composite{primal_type, typeof(tp)}(tp))
   else
     #TODO: we could fix this if we had the primal values
