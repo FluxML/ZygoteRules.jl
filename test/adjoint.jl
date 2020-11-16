@@ -39,6 +39,13 @@ recursive_typeof(a::AbstractArray{<:Number}) = typeof(a)
         differential = Composite{Foo}(a=1, b=Zero())
         @test differential2legacy(differential) == legacy
     end
+    
+    @testset "incomplete gradient of a struct" begin
+        legacy = (a=1, b=nothing)
+        differential = Composite{Foo}(a=1,)
+        @test differential2legacy(differential) == legacy
+    end
+
     @testset "gradient of a nested struct" begin
         f = Foo(1, 2)
         b = Bar(3, f)
@@ -104,13 +111,17 @@ end
         @test legacy2differential(tuple(legacy), tuple(legacy)) == tuple(differential)
     end
 
-
     @testset "gradient of a struct" begin
         legacy = (a=1, b=nothing)
         differential = Composite{Foo}(a=1, b=Zero())
         @test legacy2differential(tuple(legacy), tuple(Foo(1, 2))) == tuple(differential)
     end
 
+    @testset "incomplete gradient of a struct" begin
+        legacy = (a=1,)
+        differential = Composite{Foo}(a=1, b=Zero())
+        @test legacy2differential(tuple(legacy), tuple(Foo(1, 2))) == tuple(differential)
+    end
 
     @testset "gradient of a nested struct" begin
         f = Foo(1, 2)
