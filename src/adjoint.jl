@@ -69,18 +69,11 @@ end
 
 function l2d(t::NamedTuple, primal)
   primal_type = typeof(primal)
-  if !isabstracttype(primal_type)
-    fnames = fieldnames(primal_type)
-    complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
-    primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
-    tp = map(l2d, complete_t, primals)
-    return canonicalize(Composite{primal_type, typeof(tp)}(tp))
-  else
-    #TODO: we could fix this if we had the primal values
-    @warn "Could not determine Primal Type. This may make bad composites. This is caused by `Array{Any}` containing structs and similar."
-    tp = l2d.(t, Any)
-    return canonicalize(Composite{primal_type, typeof(tp)}(tp))
-  end
+  fnames = fieldnames(primal_type)
+  complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
+  primals = NamedTuple{fnames}(getfield(primal, fn) for fn in fnames)
+  tp = map(l2d, complete_t, primals)
+  return canonicalize(Composite{primal_type, typeof(tp)}(tp))
 end
 
 """
