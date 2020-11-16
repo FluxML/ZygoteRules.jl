@@ -89,26 +89,26 @@ end
     @testset "tuple of gradients" begin
         legacy = (1, 2, nothing, nothing)
         differential = (1, 2, Zero(), Zero())
-        @test legacy2differential(legacy, recursive_typeof(legacy)) == differential
+        @test legacy2differential(legacy, legacy) == differential
     end
 
     @testset "gradient of a tuple" begin
         legacy = (nothing, 1, nothing)
         differential = Composite{typeof(legacy)}(Zero(), 1, Zero())
-        @test legacy2differential(tuple(legacy), typeof.(tuple(legacy))) == tuple(differential)
+        @test legacy2differential(tuple(legacy), tuple(legacy)) == tuple(differential)
     end
 
     @testset "gradient of a named tuple" begin
         legacy = (a=nothing, b=1, c=nothing)
         differential = Composite{typeof(legacy)}(a=Zero(), b=1, c=Zero())
-        @test legacy2differential(tuple(legacy), recursive_typeof(tuple(legacy))) == tuple(differential)
+        @test legacy2differential(tuple(legacy), tuple(legacy)) == tuple(differential)
     end
 
 
     @testset "gradient of a struct" begin
         legacy = (a=1, b=nothing)
         differential = Composite{Foo}(a=1, b=Zero())
-        @test legacy2differential(tuple(legacy), tuple(Foo)) == tuple(differential)
+        @test legacy2differential(tuple(legacy), tuple(Foo(1, 2))) == tuple(differential)
     end
 
 
@@ -117,35 +117,35 @@ end
         b = Bar(3, f)
         legacy = (x=nothing, y=(a=1, b=nothing))
         differential = Composite{Bar}(x=Zero(), y=Composite{Foo}(a=1, b=Zero()))
-        @test legacy2differential(tuple(legacy), tuple(Bar)) == tuple(differential)
+        @test legacy2differential(tuple(legacy), tuple(b)) == tuple(differential)
     end
 
-    @testset "gradient of an array" begin # do not need this since gradtuple is inside
+    @testset "gradient of an array" begin
         dfoo = (a=1, b=nothing)
         legacy = [dfoo, 1, nothing]
         differential = [Composite{typeof(dfoo)}(a=1, b=Zero()), 1, Zero()]
-        @test_broken legacy2differential(legacy, recursive_typeof(legacy)) == differential
+        @test legacy2differential(legacy, legacy) == differential
     end
 
     @testset "gradient of an array in a tuple" begin
         dfoo = (a=1, b=nothing)
         legacy = [dfoo, 1, nothing]
         differential = [Composite{typeof(dfoo)}(a=1, b=Zero()), 1, Zero()]
-        @test legacy2differential(tuple(legacy), recursive_typeof(tuple(legacy))) == tuple(differential)
+        @test legacy2differential(tuple(legacy), tuple(legacy)) == tuple(differential)
     end
     
-    @testset "gradient of an array with an array element" begin # do not need this since gradtuple is inside
+    @testset "gradient of an array with an array element" begin
         dfoo = [(a=1, b=nothing), nothing]
         legacy = [dfoo, 1, nothing]
         differential = [[Composite{typeof(dfoo)}(a=1, b=Zero()), Zero()], 1, Zero()]
-        @test_broken legacy2differential(legacy, recursive_typeof(legacy)) == differential
+        @test legacy2differential(legacy, legacy) == differential
     end
 
     @testset "tuple of a tuple of array" begin
         ta = ([0.3 0.2; 0.1 2.0],)
         legacy = (ta, nothing)
         differential = (Composite{typeof(ta)}([0.3 0.2; 0.1 2.0],), Zero())
-        @test legacy2differential(legacy, typeof.(legacy)) == differential
+        @test legacy2differential(legacy, legacy) == differential
     end
 
     @testset "triple nested tuple" begin
@@ -157,6 +157,6 @@ end
                 Composite{Tuple{Zero,Int64}}(Zero(), 1),
             ),
         )
-        @test legacy2differential(legacy, typeof.(legacy)) == differential
+        @test legacy2differential(legacy, legacy) == differential
     end
 end

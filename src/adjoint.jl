@@ -52,31 +52,28 @@ end
 
 Convert input `x` from the legacy ZygoteRules format to the ChainRules differential types.
 """
-legacy2differential(x, primal_type) = l2d(x, primal_type)
+legacy2differential(x, dummy_primal) = l2d(x, dummy_primal)
 legacy2differential(::Nothing, ::Any) = Zero()
-legacy2differential(t::Tuple, primal_types::Tuple) = map(l2d, t, primal_types)
-#legacy2differential(t::Tuple, primal_types::Tuple) = ntuple(i->l2d(t[i], primal_types[i]), length(t))
-legacy2differential(t::Tuple, primal_types) = (@warn "primal_types should be a tuple, not $primal_types"; return t)
-
+legacy2differential(t::Tuple, dummy_primal::Tuple) = map(l2d, t, dummy_primal)
+legacy2differential(t::Tuple, dummy_primal) = (@warn "dummy_primal should be a tuple, not $dummy_primal"; return t)
 l2d(x, ::Any) = x
 l2d(::Nothing, ::Any) = Zero()
-l2d(a::AbstractArray{<:Number}, primal_type) = a
-l2d(a::AbstractArray, primal_type) = l2d.(a, eltype(primal_type))
-l2d(a::AbstractArray, primal_type::AbstractArray{T}) where T = l2d.(a, primal_type) # TODO: T or primal_type?
+l2d(a::AbstractArray{<:Number}, dummy_primal::AbstractArray{T}) where T = a
+l2d(a::AbstractArray, dummy_primal::AbstractArray{T}) where T = l2d.(a, dummy_primal)
 l2d(x::Union{AbstractZero, Composite}, ::Any) = (difftype_warn(x); return x)
-function l2d(t::Tuple, primal_type)
-  primal_field_types = fieldtypes(primal_type)
-  tp = map(l2d, t, primal_field_types)
-  #tp = ntuple(i -> l2d(t[i], primal_field_types[i]), length(t))
+function l2d(t::Tuple, dummy_primal)
+  tp = map(l2d, t, dummy_primal)
+  primal_type = typeof(dummy_primal)
   return canonicalize(Composite{primal_type, typeof(tp)}(tp))
 end
 
-function l2d(t::NamedTuple, primal_type)
+function l2d(t::NamedTuple, dummy_primal)
+  primal_type = typeof(dummy_primal)
   if !isabstracttype(primal_type)
-    primal_field_types = NamedTuple{Tuple(fieldnames(primal_type))}(fieldtypes(primal_type))
-    complete_t = NamedTuple{keys(primal_field_types)}(k in keys(t) ? t[k] : nothing for (k,v) in pairs(primal_field_types))
-    tp = map(l2d, complete_t, primal_field_types)
-    #tp = NamedTuple{fieldnames(typeof(t))}(ntuple(i->l2d(t[i], primal_field_types[i]), length(t)))
+    fnames = fieldnames(primal_type)
+    complete_t = NamedTuple{fnames}(fn in keys(t) ? t[fn] : nothing for fn in fnames)
+    dummy_primals = NamedTuple{fnames}(getfield(dummy_primal, fn) for fn in fnames)
+    tp = map(l2d, complete_t, dummy_primals)
     return canonicalize(Composite{primal_type, typeof(tp)}(tp))
   else
     #TODO: we could fix this if we had the primal values
@@ -152,38 +149,40 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
-      argtypes = map(typeof, ($(argnames...),))
+      myargs = map(identity, ($(argnames...),)) # TODO make this more elegant
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
       function back(Δ)
         _partials = _back(differential2legacy(Δ))
-        if _partials isa Tuple && any(x isa Union{AbstractZero, Composite} for x in _partials)
-          @warn "Wrong partial type returned. adjoint definition:"
-          @show ($(QuoteNode(ex)))
-        end
-        if _partials isa Union{AbstractZero, Composite}
-          @warn "Wrong partial type returned. adjoint definition:"
-          @show ($(QuoteNode(ex)))
-        end
+        legacy2differential($gradtuple(_partials), ($T, myargs...)) # replaces the commented part
+        
+        # if _partials isa Tuple && any(x isa Union{AbstractZero, Composite} for x in _partials)
+        #   @warn "Wrong partial type returned. adjoint definition:"
+        #   @show ($(QuoteNode(ex)))
+        # end
+        # if _partials isa Union{AbstractZero, Composite}
+        #   @warn "Wrong partial type returned. adjoint definition:"
+        #   @show ($(QuoteNode(ex)))
+        # end
 
-        try
-          legacy2differential($gradtuple(_partials), ($T, argtypes...))
-        catch
-          println("Error occured. adjoint definition:")
-          @show ($(QuoteNode(ex)))
-          rethrow()
-        end
+        # try
+        #   legacy2differential($gradtuple(_partials), ($T, myargs...))
+        # catch
+        #   println("Error occured. adjoint definition:")
+        #   @show ($(QuoteNode(ex)))
+        #   rethrow()
+        # end
       end
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
-      argtypes = map(typeof, ($(argnames...),))
+      newargs = map(identity, ($(argnames...),)) # TODO: make these more elegant
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Union{Nothing,AbstractZero}) = Zero()))
       #back(Δ) = $gradtuplekw(legacy2differential(_partials, argtypes))
       function back(Δ)
         _partials = _back(differential2legacy(Δ))
-        legacy2differential($gradtuplekw(_partials), ($kT, typeof(kw), $T, argtypes...))
+        legacy2differential($gradtuplekw(_partials), ($kT, typeof(kw), $T, newargs...))
       end
       return y, back
     end
