@@ -12,4 +12,8 @@ literal_getproperty(x, ::Val{f}) where f = getproperty(x, f)
 
 include("adjoint.jl")
 
+# Forward mode:
+function pushforward end
+function _pushforward end
+
 end
