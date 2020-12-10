@@ -16,4 +16,10 @@ include("adjoint.jl")
 function pushforward end
 function _pushforward end
 
+# ForwardDiff interface:
+function seed end
+function extract end
+function forward_jacobian end
+function forwarddiff end
+
 end
