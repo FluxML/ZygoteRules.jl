@@ -3,6 +3,7 @@ uuid = "700de1a5-db45-46bc-99cf-38207098b444"
 version = "0.2.1"
 
 [deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]

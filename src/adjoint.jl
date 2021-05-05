@@ -87,3 +87,61 @@ clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
     map(clamptype, Ts, dxs)
 clamptype(x, dx) = (@debug "Any" x dx; dx)
 
+import LinearAlgebra
+# Matrix wrappers
+for ST in [:Diagonal, :Symmetric, :Hermitian, :UpperTriangular, :LowerTriangular]
+  str = string("preserving ", ST)
+  @eval begin
+    clamptype(::Type{<:LinearAlgebra.$ST}, dx::LinearAlgebra.$ST) = dx
+    clamptype(::Type{<:LinearAlgebra.$ST}, dx::AbstractMatrix) = (@info $str; LinearAlgebra.$ST(dx))
+    # these won't yet compose with complex to real, should call on parent somehow?
+  end
+end
+# Vector wrappers
+clamptype(T::Type{<:LinearAlgebra.Adjoint{<:Number, <:AbstractVector}}, dx::LinearAlgebra.AdjOrTransAbsVec) = dx
+clamptype(T::Type{<:LinearAlgebra.Adjoint{<:Number, <:AbstractVector}}, dx::AbstractMatrix) =
+  if eltype(dx) <: Real
+    @info "preserving Adjoint"
+    Base.adjoint(vec(dx))
+  else
+    @info "Adjoint -> Transpose"
+    transpose(vec(dx))
+  end
+clamptype(T::Type{<:LinearAlgebra.Transpose{<:Number, <:AbstractVector}}, dx::LinearAlgebra.AdjOrTransAbsVec) = dx
+clamptype(T::Type{<:LinearAlgebra.Transpose{<:Number, <:AbstractVector}}, dx::AbstractMatrix) = 
+  (@info "preserving Transpose"; transpose(vec(dx)))
+
+#=
+
+using Zygote, LinearAlgebra
+
+using ZygoteRules
+ENV["JULIA_DEBUG"] = "all"
+
+gradient(x -> abs2(x+im), 0.2)     # was (0.4 + 2.0im,)
+gradient(x -> abs2(x+im), 0.2+0im) # old & new agree
+
+gradient(x -> sum(sqrt.(x .+ 10)), Diagonal(rand(3)))[1]
+
+sy1 = gradient(x -> sum(x .+ 1), Symmetric(ones(3,3)))[1] # tries but fails
+sy2 = gradient(x -> sum(x * x'), Symmetric(ones(3,3)))[1] # tries but fails
+
+ud = gradient((x,y) -> sum(x * y), UpperTriangular(ones(3,3)), Diagonal(ones(3,3)));
+ud[1] # works, UpperTriangular
+ud[2] # fails to preserve Diagonal
+
+@eval Zygote begin  # crudely apply this also to ChainRules rules:
+  using ZygoteRules: clamptype
+  @inline function chain_rrule(f, args...)
+    y, back = rrule(f, args...)
+    ctype = (Nothing, map(typeof, args)...)
+    return y, (b -> clamptype(ctype, b))∘ZBack(back)
+  end
+
+# now ud[2] works, sy still fails.
+
+Zygote.pullback(x -> x.+1, rand(3)')[2](ones(1,3))[1]
+Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](ones(1,3))[1]
+Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](fill(0+im, 1,3))[1]
+
+=#
