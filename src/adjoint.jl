@@ -86,7 +86,7 @@ clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) =
 clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
     map(clamptype, Ts, dxs)
 clamptype(T, dx) = (@debug "Any" T dx; dx)
-clamptype(Ts::Tuple, dx::Tuple) = (@warn "mismatched lengths" Ts dx; dx)
+# clamptype(Ts::Tuple, dx::Tuple) = (@warn "mismatched lengths" Ts dx; dx)
 
 # Booleans aren't differentiable
 clamptype(::Type{Bool}, dx) = (@info "Bool => dropping $dx"; nothing)
@@ -94,19 +94,23 @@ clamptype(::Type{Bool}, dx::Complex) = (@info "Bool => dropping $dx"; nothing)  
 clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray) = (@info "Bool array => dropping $dx"; nothing)
 clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray{<:Complex}) = (@info "Bool array => dropping complex $dx"; nothing)
 
-import LinearAlgebra
+using LinearAlgebra: LinearAlgebra, 
+  Diagonal, UpperTriangular, LowerTriangular, Symmetric, Hermitian, 
+  Adjoint, Transpose, AdjOrTransAbsVec
+
 # Matrix wrappers
-for ST in [:Diagonal, :Symmetric, :Hermitian, :UpperTriangular, :LowerTriangular]
+for (ST, proj) in [(:Diagonal, Diagonal), (:UpperTriangular, UpperTriangular), (:LowerTriangular, LowerTriangular),
+    (:Symmetric, x -> Symmetric((x .+ transpose(x)) ./ 2)), (:Hermitian, x -> Hermitian((x .+ adjoint(x)) ./ 2)) ]
   str = string("preserving ", ST)
   @eval begin
-    clamptype(::Type{<:LinearAlgebra.$ST}, dx::LinearAlgebra.$ST) = dx
-    clamptype(::Type{<:LinearAlgebra.$ST}, dx::AbstractMatrix) = (@info $str; LinearAlgebra.$ST(dx))
+    clamptype(::Type{<:$ST}, dx::$ST) = dx
+    clamptype(::Type{<:$ST}, dx::AbstractMatrix) = (@info $str; $proj(dx))
     # these won't yet compose with complex to real, should call on parent somehow?
   end
 end
 # Vector wrappers
-clamptype(T::Type{<:LinearAlgebra.Adjoint{<:Number, <:AbstractVector}}, dx::LinearAlgebra.AdjOrTransAbsVec) = dx
-clamptype(T::Type{<:LinearAlgebra.Adjoint{<:Number, <:AbstractVector}}, dx::AbstractMatrix) =
+clamptype(T::Type{<:Adjoint{<:Number, <:AbstractVector}}, dx::AdjOrTransAbsVec) = dx
+clamptype(T::Type{<:Adjoint{<:Number, <:AbstractVector}}, dx::AbstractMatrix) =
   if eltype(dx) <: Real
     @info "preserving Adjoint"
     Base.adjoint(vec(dx))
@@ -114,8 +118,8 @@ clamptype(T::Type{<:LinearAlgebra.Adjoint{<:Number, <:AbstractVector}}, dx::Abst
     @info "Adjoint -> Transpose"
     transpose(vec(dx))
   end
-clamptype(T::Type{<:LinearAlgebra.Transpose{<:Number, <:AbstractVector}}, dx::LinearAlgebra.AdjOrTransAbsVec) = dx
-clamptype(T::Type{<:LinearAlgebra.Transpose{<:Number, <:AbstractVector}}, dx::AbstractMatrix) = 
+clamptype(T::Type{<:Transpose{<:Number, <:AbstractVector}}, dx::AdjOrTransAbsVec) = dx
+clamptype(T::Type{<:Transpose{<:Number, <:AbstractVector}}, dx::AbstractMatrix) = 
   (@info "preserving Transpose"; transpose(vec(dx)))
 
 #=
@@ -143,7 +147,10 @@ gradient(x -> sum(sqrt.(x .+ 10)), rand(3) .> 0.5)  # uses array rule
 
 gradient(x -> sum(sqrt.(x .+ 10)), Diagonal(rand(3)))[1]
 
-sy1 = gradient(x -> sum(x .+ 1), Symmetric(ones(3,3)))[1] # tries but fails
+gradient(x -> x[1,2], Symmetric(ones(3,3)))[1]           # Symmetric
+gradient(x -> x[1,2] + x[2,1], Symmetric(ones(3,3)))[1]  # twice that
+
+sy1 = gradient(x -> sum(x .+ 1), Symmetric(ones(3,3)))[1] # Symmetric
 sy2 = gradient(x -> sum(x * x'), Symmetric(ones(3,3)))[1] # tries but fails
 
 ud = gradient((x,y) -> sum(x * y), UpperTriangular(ones(3,3)), Diagonal(ones(3,3)));
@@ -157,11 +164,13 @@ ud[2] # fails to preserve Diagonal
     ctype = (Nothing, map(typeof, args)...)
     return y, (b -> clamptype(ctype, b))∘ZBack(back)
   end
+end
 
-# now ud[2] works, sy still fails.
+# now ud[2] works, sy2 still fails.
 
-Zygote.pullback(x -> x.+1, rand(3)')[2](ones(1,3))[1]
+Zygote.pullback(x -> x.+1, rand(3)')[2](ones(1,3))[1]   # simplest adjoint(vec(dx))
 Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](ones(1,3))[1]
-Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](fill(0+im, 1,3))[1]
+Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](fill(0+im, 1,3))[1]  # uses transpose
 
 =#
+
