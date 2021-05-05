@@ -57,14 +57,14 @@ function gradm(ex, mut = false)
       argTs = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(ZygoteRules.clamptype(argTs, _back(Δ)))
+      back(Δ) = $gradtuple($clamptype(argTs, _back(Δ)))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       argTs = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(ZygoteRules.clamptype(argTs, _back(Δ)))
+      back(Δ) = $gradtuplekw($clamptype(argTs, _back(Δ)))
       return y, back
     end
     nothing
@@ -85,7 +85,8 @@ clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) =
 
 clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
     map(clamptype, Ts, dxs)
-clamptype(x, dx) = (@debug "Any" x dx; dx)
+clamptype(T, dx) = (@debug "Any" T dx; dx)
+clamptype(Ts::Tuple, dx::Tuple) = (@warn "mismatched lengths" Ts dx; dx)
 
 # Booleans aren't differentiable
 clamptype(::Type{Bool}, dx) = (@info "Bool => dropping $dx"; nothing)
@@ -121,14 +122,24 @@ clamptype(T::Type{<:LinearAlgebra.Transpose{<:Number, <:AbstractVector}}, dx::Ab
 
 using Zygote, LinearAlgebra
 
-using ZygoteRules
-ENV["JULIA_DEBUG"] = "all"
+# using ZygoteRules
+# ENV["JULIA_DEBUG"] = "all"
+
+# Complex
 
 gradient(x -> abs2(x+im), 0.2)     # was (0.4 + 2.0im,)
 gradient(x -> abs2(x+im), 0.2+0im) # old & new agree
 
+gradient(x -> abs2(sum(x .+ im)), [0.1, 0.2])    # uses array rule, makes a Fill
+gradient(x -> abs2(sum(x .+ im)), Any[0.1, 0.2]) # uses scalar rule, makes an Array
+
+# Bool
+
 gradient(sqrt, true)
-gradient(x -> sum(sqrt, x), rand(3) .> 0.5)
+gradient(x -> sum(sqrt, x), rand(3) .> 0.5) # uses scalar rule
+gradient(x -> sum(sqrt.(x .+ 10)), rand(3) .> 0.5)  # uses array rule
+
+# LinearAlgebra
 
 gradient(x -> sum(sqrt.(x .+ 10)), Diagonal(rand(3)))[1]
 
