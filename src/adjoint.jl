@@ -87,6 +87,12 @@ clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
     map(clamptype, Ts, dxs)
 clamptype(x, dx) = (@debug "Any" x dx; dx)
 
+# Booleans aren't differentiable
+clamptype(::Type{Bool}, dx) = (@info "Bool => dropping $dx"; nothing)
+clamptype(::Type{Bool}, dx::Complex) = (@info "Bool => dropping $dx"; nothing)  # for ambiguity
+clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray) = (@info "Bool array => dropping $dx"; nothing)
+clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray{<:Complex}) = (@info "Bool array => dropping complex $dx"; nothing)
+
 import LinearAlgebra
 # Matrix wrappers
 for ST in [:Diagonal, :Symmetric, :Hermitian, :UpperTriangular, :LowerTriangular]
@@ -120,6 +126,9 @@ ENV["JULIA_DEBUG"] = "all"
 
 gradient(x -> abs2(x+im), 0.2)     # was (0.4 + 2.0im,)
 gradient(x -> abs2(x+im), 0.2+0im) # old & new agree
+
+gradient(sqrt, true)
+gradient(x -> sum(sqrt, x), rand(3) .> 0.5)
 
 gradient(x -> sum(sqrt.(x .+ 10)), Diagonal(rand(3)))[1]
 
