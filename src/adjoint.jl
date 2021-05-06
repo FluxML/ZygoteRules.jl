@@ -29,6 +29,7 @@ abstract type AContext end
 function adjoint end
 function _pullback end
 function pullback end
+clamptype(T, dx) = dx
 
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
@@ -78,70 +79,3 @@ end
 macro adjoint!(ex)
   gradm(ex, true)
 end
-
-clamptype(T, dx) = dx
-clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} = map(clamptype, Ts, dxs)
-
-function clamptype(Ts::Tuple, dx::Tuple)
-  if length(Ts)>1 && first(Ts) == GlobalRef
-    clamptype(Base.tail(Ts), dx)
-  else
-    @info "mismatched lengths" Ts dx
-    dx
-  end
-end
-
-#=
-
-
-
-using Zygote, LinearAlgebra
-
-# using ZygoteRules
-# ENV["JULIA_DEBUG"] = "all"
-
-# Complex
-
-gradient(x -> abs2(x+im), 0.2)     # was (0.4 + 2.0im,)
-gradient(x -> abs2(x+im), 0.2+0im) # old & new agree
-
-gradient(x -> abs2(sum(x .+ im)), [0.1, 0.2])    # uses array rule, makes a Fill
-gradient(x -> abs2(sum(x .+ im)), Any[0.1, 0.2]) # uses scalar rule, makes an Array
-
-# Bool
-
-gradient(sqrt, true)
-gradient(x -> sum(sqrt, x), rand(3) .> 0.5) # uses scalar rule
-gradient(x -> sum(sqrt.(x .+ 10)), rand(3) .> 0.5)  # uses array rule
-
-# LinearAlgebra
-
-gradient(x -> sum(sqrt.(x .+ 10)), Diagonal(rand(3)))[1]
-
-gradient(x -> x[1,2], Symmetric(ones(3,3)))[1]           # Symmetric
-gradient(x -> x[1,2] + x[2,1], Symmetric(ones(3,3)))[1]  # twice that
-
-sy1 = gradient(x -> sum(x .+ 1), Symmetric(ones(3,3)))[1] # Symmetric
-sy2 = gradient(x -> sum(x * x'), Symmetric(ones(3,3)))[1] # tries but fails
-
-ud = gradient((x,y) -> sum(x * y), UpperTriangular(ones(3,3)), Diagonal(ones(3,3)));
-ud[1] # works, UpperTriangular
-ud[2] # fails to preserve Diagonal
-
-@eval Zygote begin  # crudely apply this also to ChainRules rules:
-  using ZygoteRules: clamptype
-  @inline function chain_rrule(f, args...)
-    y, back = rrule(f, args...)
-    ctype = (Nothing, map(typeof, args)...)
-    return y, (b -> clamptype(ctype, b))∘ZBack(back)
-  end
-end
-
-# now ud[2] works, sy2 still fails.
-
-Zygote.pullback(x -> x.+1, rand(3)')[2](ones(1,3))[1]   # simplest adjoint(vec(dx))
-Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](ones(1,3))[1]
-Zygote.pullback(x -> x.+1, rand(ComplexF64, 3)')[2](fill(0+im, 1,3))[1]  # uses transpose
-
-=#
-
