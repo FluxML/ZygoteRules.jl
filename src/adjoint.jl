@@ -29,6 +29,7 @@ abstract type AContext end
 function adjoint end
 function _pullback end
 function pullback end
+clamptype(T, dx) = dx
 
 function gradm(ex, mut = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
@@ -54,15 +55,17 @@ function gradm(ex, mut = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
+      argTs = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(_back(Δ))
+      back(Δ) = $gradtuple($clamptype(argTs, _back(Δ)))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
+      argTs = map(typeof, ($(argnames...),))
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(_back(Δ))
+      back(Δ) = $gradtuplekw($clamptype(argTs, _back(Δ)))
       return y, back
     end
     nothing
