@@ -79,50 +79,21 @@ macro adjoint!(ex)
   gradm(ex, true)
 end
 
-clamptype(::Type{<:Real}, dx::Complex) = (@info "preserving Real, from $dx"; real(dx))
-clamptype(::Type{<:AbstractArray{<:Real}}, dx::AbstractArray{<:Complex}) = 
-  (@info "fixing AbstractArray{<:Complex}"; real(dx))
+clamptype(T, dx) = dx
+clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} = map(clamptype, Ts, dxs)
 
-clamptype(Ts::Tuple{Vararg{<:Type,N}}, dxs::Tuple{Vararg{Any,N}}) where {N} =
-    map(clamptype, Ts, dxs)
-clamptype(T, dx) = (@debug "Any" T dx; dx)
-# clamptype(Ts::Tuple, dx::Tuple) = (@warn "mismatched lengths" Ts dx; dx)
-
-# Booleans aren't differentiable
-clamptype(::Type{Bool}, dx) = (@info "Bool => dropping $dx"; nothing)
-clamptype(::Type{Bool}, dx::Complex) = (@info "Bool => dropping $dx"; nothing)  # for ambiguity
-clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray) = (@info "Bool array => dropping $dx"; nothing)
-clamptype(::Type{<:AbstractArray{<:Bool}}, dx::AbstractArray{<:Complex}) = (@info "Bool array => dropping complex $dx"; nothing)
-
-using LinearAlgebra: LinearAlgebra, 
-  Diagonal, UpperTriangular, LowerTriangular, Symmetric, Hermitian, 
-  Adjoint, Transpose, AdjOrTransAbsVec
-
-# Matrix wrappers
-for (ST, proj) in [(:Diagonal, Diagonal), (:UpperTriangular, UpperTriangular), (:LowerTriangular, LowerTriangular),
-    (:Symmetric, x -> Symmetric((x .+ transpose(x)) ./ 2)), (:Hermitian, x -> Hermitian((x .+ adjoint(x)) ./ 2)) ]
-  str = string("preserving ", ST)
-  @eval begin
-    clamptype(::Type{<:$ST}, dx::$ST) = dx
-    clamptype(::Type{<:$ST}, dx::AbstractMatrix) = (@info $str; $proj(dx))
-    # these won't yet compose with complex to real, should call on parent somehow?
+function clamptype(Ts::Tuple, dx::Tuple)
+  if length(Ts)>1 && first(Ts) == GlobalRef
+    clamptype(Base.tail(Ts), dx)
+  else
+    @info "mismatched lengths" Ts dx
+    dx
   end
 end
-# Vector wrappers
-clamptype(T::Type{<:Adjoint{<:Number, <:AbstractVector}}, dx::AdjOrTransAbsVec) = dx
-clamptype(T::Type{<:Adjoint{<:Number, <:AbstractVector}}, dx::AbstractMatrix) =
-  if eltype(dx) <: Real
-    @info "preserving Adjoint"
-    Base.adjoint(vec(dx))
-  else
-    @info "Adjoint -> Transpose"
-    transpose(vec(dx))
-  end
-clamptype(T::Type{<:Transpose{<:Number, <:AbstractVector}}, dx::AdjOrTransAbsVec) = dx
-clamptype(T::Type{<:Transpose{<:Number, <:AbstractVector}}, dx::AbstractMatrix) = 
-  (@info "preserving Transpose"; transpose(vec(dx)))
 
 #=
+
+
 
 using Zygote, LinearAlgebra
 
