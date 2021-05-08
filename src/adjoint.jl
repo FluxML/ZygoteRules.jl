@@ -34,6 +34,7 @@ function pullback end
 function unthunk_tangent end
 @inline unthunk_tangent(x) = x
 @inline unthunk_tangent(x::Tuple) = map(unthunk_tangent, x)
+@inline unthunk_tangent(x::NamedTuple) = map(unthunk_tangent, x)
 
 
 function gradm(ex, mut = false, keepthunks = false)
