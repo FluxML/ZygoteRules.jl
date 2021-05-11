@@ -1,6 +1,6 @@
 module ZygoteRules
 
-export @adjoint, @adjoint!, @adjoint_keepthunks, @adjoint_keepthunks!
+export @adjoint, @adjoint!
 
 """
     ZygoteRules.literal_getproperty(x, ::Val{f})

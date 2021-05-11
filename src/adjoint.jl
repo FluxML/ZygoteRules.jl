@@ -84,11 +84,3 @@ end
 macro adjoint!(ex)
   gradm(ex, true, false)
 end
-
-macro adjoint_keepthunks(ex)
-  gradm(ex, false, true)
-end
-
-macro adjoint_keepthunks!(ex)
-  gradm(ex, true, true)
-end
