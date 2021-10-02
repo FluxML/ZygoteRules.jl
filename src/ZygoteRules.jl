@@ -19,5 +19,6 @@ In Zygote, differentiation of property access is defined by defining adjoint of
 literal_getfield(x, ::Val{f}) where f = getfield(x, f)
 
 include("adjoint.jl")
+include("getproperty_performance_workaround.jl")
 
 end
