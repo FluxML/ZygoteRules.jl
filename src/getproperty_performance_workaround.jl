@@ -6,11 +6,13 @@ known performance issue in Zygote.
 
 To use this for your type `YourType`, copy + paste the following
 ```julia
-import ZygoteRules: _pullback, AContext, literal_getproperty
-function _pullback(
+using ZygoteRules
+using ZygoteRules: AContext, literal_getproperty, pullback_for_default_literal_getproperty
+
+function ZygoteRules._pullback(
   cx::AContext, ::typeof(literal_getproperty), x::YourType, ::Val{f}
 ) where {f}
-  return pullback_for_default_method_of_literal_getproperty(cx, x, Val{f}())
+    return pullback_for_default_literal_getproperty(cx, x, Val{f}())
 end
 ```
 and replace `YourType` with the name of your type.
