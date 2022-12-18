@@ -37,6 +37,9 @@ function unthunk_tangent end
 @inline unthunk_tangent(x::NamedTuple) = map(unthunk_tangent, x)
 
 
+@inline maybe_final(cx, y) = nothing
+
+
 function gradm(ex, mut = false, keepthunks = false)
   @capture(shortdef(ex), (name_(args__) = body_) |
                          (name_(args__) where {Ts__} = body_)) || error("Need a function definition")
@@ -64,13 +67,13 @@ function gradm(ex, mut = false, keepthunks = false)
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuple(_back($maybe_unthunked_Δ))
+      back(Δ) = begin ∇s = $gradtuple(_back($maybe_unthunked_Δ)); maybe_final(__context__,y); ∇s end
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
       $(mut ? nothing : :(back(::Nothing) = nothing))
-      back(Δ) = $gradtuplekw(_back($maybe_unthunked_Δ))
+      back(Δ) = begin ∇s = $gradtuplekw(_back($maybe_unthunked_Δ)); maybe_final(__context__,y); ∇s end
       return y, back
     end
     nothing
