@@ -1,5 +1,6 @@
 using MacroTools
 using MacroTools: @q, combinedef
+using ChainRulesCore: AbstractZero
 
 function named(arg)
   if isexpr(arg, :(::)) && length(arg.args) == 1
@@ -63,13 +64,19 @@ function gradm(ex, mut = false, keepthunks = false)
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...))
-      $(mut ? nothing : :(back(::Nothing) = nothing))
+      $(mut ? nothing : quote
+        back(::Nothing) = nothing
+        back(Δ::AbstractZero) = $gradtuple(ntuple(_ -> Δ, $(length(args))))
+      end)
       back(Δ) = $gradtuple(_back($maybe_unthunked_Δ))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
       y, _back = adjoint(__context__, $f, $(argnames...); kw...)
-      $(mut ? nothing : :(back(::Nothing) = nothing))
+      $(mut ? nothing : quote
+        back(::Nothing) = nothing
+        back(Δ::AbstractZero) = $gradtuplekw(ntuple(_ -> Δ, $(length(args))))
+      end)
       back(Δ) = $gradtuplekw(_back($maybe_unthunked_Δ))
       return y, back
     end
