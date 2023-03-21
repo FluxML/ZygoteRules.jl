@@ -7,6 +7,7 @@ ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 
 [compat]
+ChainRulesCore = "1.9"
 MacroTools = "0.5"
 julia = "1"
 
