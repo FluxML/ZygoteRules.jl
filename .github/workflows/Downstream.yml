@@ -1,5 +1,5 @@
-  
 name: IntegrationTest
+
 on:
   push:
     branches: [master]
