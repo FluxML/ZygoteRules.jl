@@ -21,6 +21,7 @@ for n = 0:3
   gradtuple = Symbol(:gradtuple, n)
   @eval begin
     $gradtuple(x::Tuple) = ($(ntuple(_->:nothing,n)...), x...)
+    $gradtuple(::Tuple{Vararg{Nothing}}) = nothing
     $gradtuple(x::Nothing) = nothing
     $gradtuple(x) = error("Gradient $x should be a tuple")
   end
