@@ -1,6 +1,6 @@
 using MacroTools
 using MacroTools: @q, combinedef
-using ChainRulesCore: AbstractZero
+using ChainRulesCore: AbstractZero, @non_differentiable
 
 function named(arg)
   if isexpr(arg, :(::)) && length(arg.args) == 1
@@ -37,6 +37,12 @@ function unthunk_tangent end
 @inline unthunk_tangent(x) = x
 @inline unthunk_tangent(x::Tuple) = map(unthunk_tangent, x)
 @inline unthunk_tangent(x::NamedTuple) = map(unthunk_tangent, x)
+@inline unthunk_tangent(x::AbstractThunk) = wrap_chainrules_output(unthunk(x))
+@inline unthunk_tangent(x::NTuple{N,<:Number}) where N = x
+@inline unthunk_tangent(x::AbstractArray{<:Number,N}) where N = x
+@inline unthunk_tangent(x::AbstractArray) = map(unthunk_tangent, x)
+unthunk_tangent(d::IdDict) = IdDict([unthunk_tangent(k) => unthunk_tangent(v) for (k, v) in d])
+@non_differentiable unthunk_tangent(::IdDict)
 
 
 function gradm(ex, mut = false, keepthunks = false)
