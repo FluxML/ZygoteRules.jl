@@ -1,6 +1,6 @@
 using MacroTools
 using MacroTools: @q, combinedef
-using ChainRulesCore: AbstractZero, @non_differentiable
+using ChainRulesCore: AbstractZero, AbstractThunk, @non_differentiable
 
 function named(arg)
   if isexpr(arg, :(::)) && length(arg.args) == 1
