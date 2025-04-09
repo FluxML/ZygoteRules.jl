@@ -79,6 +79,7 @@ function gradm(ex, mut = false, keepthunks = false)
         back(::Nothing) = nothing
         back(Δ::AbstractZero) = $gradtuplekw(ntuple(_ -> Δ, $(length(args))))
       end)
+      $maybe_unthunk
       back(Δ) = $gradtuplekw(_back(Δ))
       return y, back
     end
