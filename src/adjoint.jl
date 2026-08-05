@@ -55,7 +55,8 @@ function gradm(ex, mut = false, keepthunks = false)
   args = esc.(args)
   argnames = esc.(argnames)
   Ts = esc.(Ts)
-  cx = :($(esc(:__context__))::AContext)
+  cxname = esc(:__context__)
+  cx = :($cxname::AContext)
   fargs = kw == nothing ? [cx, :($f::$T), args...] : [kw, cx, :($f::$T), args...]
   gradtuple   = isclosure ? gradtuple0 : gradtuple1
   gradtuplekw = isclosure ? gradtuple2 : gradtuple3
@@ -64,7 +65,7 @@ function gradm(ex, mut = false, keepthunks = false)
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
-      y, _back = adjoint(__context__, $f, $(argnames...))
+      y, _back = adjoint($cxname, $f, $(argnames...))
       $(mut ? nothing : quote
         back(::Nothing) = nothing
         back(Δ::AbstractZero) = $gradtuple(ntuple(_ -> Δ, $(length(args))))
@@ -73,7 +74,7 @@ function gradm(ex, mut = false, keepthunks = false)
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
-      y, _back = adjoint(__context__, $f, $(argnames...); kw...)
+      y, _back = adjoint($cxname, $f, $(argnames...); kw...)
       $(mut ? nothing : quote
         back(::Nothing) = nothing
         back(Δ::AbstractZero) = $gradtuplekw(ntuple(_ -> Δ, $(length(args))))
