@@ -61,7 +61,7 @@ function gradm(ex, mut = false, keepthunks = false)
   gradtuple   = isclosure ? gradtuple0 : gradtuple1
   gradtuplekw = isclosure ? gradtuple2 : gradtuple3
   adj = @q @inline ZygoteRules.adjoint($(fargs...)) where $(Ts...) = $(esc(body))
-  maybe_unthunked_Δ = keepthunks ? :Δ : :(unthunk_tangent(Δ))
+  maybe_unthunk = keepthunks ? nothing : :(back(Δ::AbstractThunk) = back(unthunk_tangent(Δ)))
   quote
     $adj
     @inline function ZygoteRules._pullback($cx, $f::$T, $(args...)) where $(Ts...)
@@ -70,7 +70,8 @@ function gradm(ex, mut = false, keepthunks = false)
         back(::Nothing) = nothing
         back(Δ::AbstractZero) = $gradtuple(ntuple(_ -> Δ, $(length(args))))
       end)
-      back(Δ) = $gradtuple(_back($maybe_unthunked_Δ))
+      $maybe_unthunk
+      back(Δ) = $gradtuple(_back(Δ))
       return y, back
     end
     @inline function ZygoteRules._pullback($cx, ::$kT, kw, $f::$T, $(args...)) where $(Ts...)
@@ -79,7 +80,8 @@ function gradm(ex, mut = false, keepthunks = false)
         back(::Nothing) = nothing
         back(Δ::AbstractZero) = $gradtuplekw(ntuple(_ -> Δ, $(length(args))))
       end)
-      back(Δ) = $gradtuplekw(_back($maybe_unthunked_Δ))
+      $maybe_unthunk
+      back(Δ) = $gradtuplekw(_back(Δ))
       return y, back
     end
     nothing
