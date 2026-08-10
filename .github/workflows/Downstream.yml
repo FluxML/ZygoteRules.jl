@@ -27,14 +27,14 @@ jobs:
           - {user: SciML, repo: DiffEqFlux.jl, group: BasicNeuralDE}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
     steps:
-      - uses: actions/checkout@v3
-      - uses: julia-actions/setup-julia@v1
+      - uses: actions/checkout@v7
+      - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.julia-version }}
           arch: x64
-      - uses: julia-actions/julia-buildpkg@latest
+      - uses: julia-actions/julia-buildpkg@v1
       - name: Clone Downstream
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
