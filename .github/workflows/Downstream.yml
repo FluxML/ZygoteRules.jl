@@ -23,10 +23,7 @@ jobs:
         os: [ubuntu-latest]
         package:
           - {user: FluxML, repo: Flux.jl, group: All}
-          - {user: FluxML, repo: NNlib.jl, group: All}
           - {user: FluxML, repo: Zygote.jl, group: All}
-          - {user: TuringLang, repo: DistributionsAD.jl, group: Zygote}
-          - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
