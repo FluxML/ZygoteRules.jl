@@ -35,6 +35,10 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
           arch: x64
+      - uses: julia-actions/cache@v3
+        with:
+          # Keep each downstream package on its own cache; they share almost no depot.
+          cache-name: downstream-${{ matrix.package.repo }}-${{ matrix.package.group }}
       - uses: julia-actions/julia-buildpkg@v1
       - name: Clone Downstream
         uses: actions/checkout@v7
